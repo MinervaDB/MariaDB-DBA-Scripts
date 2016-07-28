@@ -113,23 +113,15 @@ check_for_socket () {
 
 ## -- Find the location of the mysql.sock file -- ##
 
-    if [ -z "$socket" ] ; then #-- 	True of the length if "STRING" is zero.
-        # Use ~/my.cnf version
-        if [ -f ~/.my.cnf ] ; then #-- True if FILE exists and is a regular file.
-            cnf_socket=$(grep ^socket ~/.my.cnf | awk -F \= '{ print $2 }' | head -1)
-        fi
-        if [ -S "$cnf_socket" ] ; then #-- True if FILE exists and is a socket.
-            socket=$cnf_socket
-        elif [ -S /var/lib/mysql/mysql.sock ] ; then
-            socket=/var/lib/mysql/mysql.sock
-        elif [ -S /var/run/mysqld/mysqld.sock ] ; then
-            socket=/var/run/mysqld/mysqld.sock
-        elif [ -S /tmp/mysql.sock ] ; then
-            socket=/tmp/mysql.sock
-        else
-            if [ -S "$ps_socket" ] ; then
-            socket=$ps_socket
-            fi
+    if [ -S /var/lib/mysql/mysql.sock ] ; then # #-- True if FILE exists and is a socket.
+        socket=/var/lib/mysql/mysql.sock
+    elif [ -S /var/run/mysqld/mysqld.sock ] ; then
+        socket=/var/run/mysqld/mysqld.sock
+    elif [ -S /tmp/mysql.sock ] ; then
+        socket=/tmp/mysql.sock
+    else
+        if [ -S "$ps_socket" ] ; then
+        socket=$ps_socket
         fi
     fi
     if [ -S "$socket" ] ; then
@@ -151,11 +143,7 @@ check_mysql_login () {
         echo UP > /dev/null
     elif [ "$is_up" != "mysqld is alive" ] ; then
         printf "\n"
-        if [ -z $prompted ] ; then
-            login_failed
-        else
-            return 1
-        fi
+        login_failed
     else
         echo "Unknow exit status"
         exit -1
@@ -164,7 +152,6 @@ check_mysql_login () {
 
 login_failed () {
 
-    echo "Could not auto detect login info!"
     echo "Found potential sockets: $found_socks"
     printf "\n"
     echo "Using: $socket"
@@ -219,7 +206,7 @@ login_validation
 clear
 echo "#####################################"
 echo "#"
-echo "# MySQL/MariaDB version: $mysql_version"
+echo "# DB version: $mysql_version"
 echo "# basedir: $basedir"
 echo "# socket: $socket"
 echo "#"
