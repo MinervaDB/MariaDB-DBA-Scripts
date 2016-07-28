@@ -1,6 +1,18 @@
 # mariadb-dba-scripts
 The script files for the DBAs to support MySQL.
 
+### mysql_start.sh, mysql_stop.sh
+
+These are SAMPLE scripts for DB start and stop.
+
+* Usage
+* 
+```
+$ ./mysql_start.sh
+
+$ ./mysql_stop.sh
+```
+
 ### mysql_get_config.sh
 
 getting MySQL/MariaDB configuration
