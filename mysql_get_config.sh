@@ -64,6 +64,51 @@ get_system_info () {
     fi
 }
 
+check_basedir () {
+
+## -- find the MySQL/MariaDB basedir -- ##
+
+    type mysql &>/dev/null ||  { # || : If the exit status of the first command is not 0, then execute the second command
+        printf "\n"
+        echo "Could not auto detect basedir!!"
+        printf "\n"
+        read -p "Would you like to provide a basedir?: [y/N] " REPLY
+            case $REPLY in
+                yes | y | Y | YES)
+                read -p "basedir: " basedir
+                ;;
+                *)
+                exit 1
+                ;;
+            esac
+    }
+
+    type mysql &>/dev/null && { # && : If the exit status of the first command is 0, then execute the second command
+        basedir=`type -p mysql | awk '{ sub("/bin/mysql", ""); print }'`
+        #str=`type -p mysql`
+        #basedir=`expr match "$str" '\(.*[^\/bin\/mysql$]\)'`
+        echo ""
+        echo "Using basedir: $basedir"
+        echo ""
+        read -p "Would you like to provide a different basedir?: [y/N] " REPLY
+            case $REPLY in
+                yes | y | Y | YES)
+                read -p "basedir: " basedir
+                ;;
+            esac
+    }
+
+    if [ -d $basedir ] ; then
+        mysql=$basedir/bin/mysql
+        mysqldump=$basedir/bin/mysqldump
+        mysqladmin=$basedir/bin/mysqladmin
+    else
+        echo "basedir is not a valid directory"
+        exit 1
+    fi
+
+}
+
 check_for_socket () {
 
 ## -- Find the location of the mysql.sock file -- ##
@@ -95,49 +140,6 @@ check_for_socket () {
         echo "If you are sure mysqld is running, set the the socket= variable at the top of this script"
         exit 1
     fi
-}
-
-check_basedir () {
-
-## -- find the MySQL/MariaDB basedir -- ##
-
-    type mysql &>/dev/null ||  { # || : If the exit status of the first command is not 0, then execute the second command
-        printf "\n"
-        echo "Could not auto detect basedir!!"
-        printf "\n"
-        read -p "Would you like to provide a basedir?: [y/N] " REPLY
-            case $REPLY in
-                yes | y | Y | YES)
-                read -p "basedir: " basedir
-                ;;
-                *)
-                exit 1
-                ;;
-            esac
-    }
-
-    type mysql &>/dev/null && { # && : If the exit status of the first command is 0, then execute the second command
-        basedir=`type -p mysql | awk '{ sub("/bin/mysql", ""); print }'`
-        echo ""
-        echo "Using basedir: $basedir"
-        echo ""
-        read -p "Would you like to provide a different basedir?: [y/N] " REPLY
-            case $REPLY in
-                yes | y | Y | YES)
-                read -p "basedir: " basedir
-                ;;
-            esac
-    }
-
-    if [ -d $basedir ] ; then
-        mysql=$basedir/bin/mysql
-        mysqldump=$basedir/bin/mysqldump
-        mysqladmin=$basedir/bin/mysqladmin
-    else
-        echo "basedir is not a valid directory"
-        exit 1
-    fi
-
 }
 
 check_mysql_login () {
