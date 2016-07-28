@@ -6,7 +6,7 @@ The script files for the DBAs to support MySQL.
 These are SAMPLE scripts for DB start and stop.
 
 * Usage
-* 
+
 ```
 $ ./mysql_start.sh
 
