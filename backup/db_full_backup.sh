@@ -30,16 +30,16 @@ additional_binary_backup() {
 		cat ${MARAIDB_LOGBIN}/mariadb-bin.index | while read binfile; do
 		if [[ ${binfile} == *${LAST_LOGBIN}* ]]; then
 			LAST_LOGBIN_point="Y"
-			if [ ! -d ${LAST_BACKUP}/GSCS_additional_binary_backup ]; then
-				mkdir ${LAST_BACKUP}/GSCS_additional_binary_backup
+			if [ ! -d ${LAST_BACKUP}/SERVICEDB_additional_binary_backup ]; then
+				mkdir ${LAST_BACKUP}/SERVICEDB_additional_binary_backup
 			fi
 			echo "additional backup binary Log (between backup and current)"
-			echo "           into ${LAST_BACKUP}/GSCS_additional_binary_backup"
+			echo "           into ${LAST_BACKUP}/SERVICEDB_additional_binary_backup"
 			echo "------------------------"
 		fi
 		if [[ ${LAST_LOGBIN_point} = "Y" ]]; then
 			echo ${binfile}
-			cp ${binfile} ${LAST_BACKUP}/GSCS_additional_binary_backup
+			cp ${binfile} ${LAST_BACKUP}/SERVICEDB_additional_binary_backup
 		fi
 		done
 
@@ -78,7 +78,7 @@ full_backup() {
 }
 
 echo "=============================================="
-echo "== GSCS DB Full Backup"
+echo "== SERVICEDB DB Full Backup"
 echo "=============================================="
 date +'Start: %Y/%m/%d %H:%M:%S'
 
