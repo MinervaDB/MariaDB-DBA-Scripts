@@ -1,7 +1,7 @@
 # mariadb-dba-scripts
 The script files for the DBAs to support MySQL/MariaDB.
 
-### mysql_start.sh, mysql_stop.sh
+## mysql_start.sh, mysql_stop.sh
 
 These are SAMPLE scripts for DB start and stop.
 
@@ -13,7 +13,7 @@ $ ./mysql_start.sh
 $ ./mysql_stop.sh
 ```
 
-### mysql_get_config.sh
+## mysql_get_config.sh
 
 getting MySQL/MariaDB configuration
 
@@ -52,11 +52,54 @@ Password:
 #####################################
 ```
 
-### mariadb_backup.sh
+## mariadb_backup.sh
 
 이 스크립트는 MariaDB 데이터베이스를 디스크로 백업하거나 디스크에 있는 백업을 확인하는데 이용할 수 있다.
 
 This script can be used to back up the MariaDB database to disk or to check for backups on disk.
+
+백업 이력은 ${LOG_HOME}/backup_all_history.log에 한 줄씩 추가되면서 기록된다. 이 파일은 csv로 받아서 사용할 수도 있다.
+
+The backup history is recorded by adding one line to $ {LOG_HOME} /backup_all_history.log. This file can also be used with csv.
+
+### Configuration
+
+이 스크립트를 사용하려면 스크립트 안에 환경설정 정보를 등록해야 한다.
+
+To use this script, you must register the configuration information in the script.
+
+```
+####################################
+# Set Environments
+####################################
+
+DB_NAME='TESTDB'
+MY_CNF="/engn001/masvc01/${DB_NAME}/my.cnf"
+
+RESERVE_DAYS=3 #DON'T  BE SET LESS THAN 1
+
+OS_USER='masvc01'
+DB_USER='backupuser'
+DB_PWD='backupuser_password'
+SOCKET="/engn001/masvc01/${DB_NAME}/mysqld.sock"
+
+ENGINE_HOME='/engn001/masvc01/mariadb-10.0.28'
+XTRABACKUP_HOME='/engn001/masvc01/percona-xtrabackup-2.4'
+
+LOGBIN_HOME="/logs001/masvc01/${DB_NAME}/binary"
+
+BACKUP_HOME="/bkup001/masvc01/${DB_NAME}"
+LOG_HOME="/bkup001/masvc01/${DB_NAME}/backup_log"
+LOG_FILE="${LOG_HOME}/backup.db.`date +%Y%m%d%H%M%S`.log"
+LOG_HISTORY="${LOG_HOME}/backup_all_history.log"
+
+MYSQL="${ENGINE_HOME}/bin/mysql --user=${DB_USER} --password=${DB_PWD} --socket=${SOCKET}"
+MYSQLDUMP="${ENGINE_HOME}/bin/mysqldump --user=${DB_USER} --password=${DB_PWD} --socket=${SOCKET}"
+MYSQLADMIN="${ENGINE_HOME}/bin/mysqladmin --user=${DB_USER} --password=${DB_PWD} --socket=${SOCKET}"
+XTRABACKUP="${XTRABACKUP_HOME}/bin/xtrabackup --defaults-file=${MY_CNF} --user=${DB_USER} --password=${DB_PWD}"
+```
+
+### Usage 
 
 ```
 $ sh mariadb_backup.sh
@@ -70,7 +113,8 @@ The following options may be given as the first argument:
 --engine    Engine Backup
 --delete    Delete Old Backups
 --list      Show list of backups on disk
-
+```
+### Full Backup example
 
 ```
 $ sh backup.sh --full
@@ -87,7 +131,7 @@ $ sh backup.sh --full
 == Backup : /bkup001/masvc01/TESTDB/TESTDB_full_20161214_1636
 ==============================================
 ```
-
+### Incremental Backup example
 
 ```
 $ sh backup.sh --incre
@@ -105,7 +149,7 @@ xtrabackup: Transaction log of lsn (23470074976) to (23488291255) was copied.
 == Backup : /bkup001/masvc01/TESTDB/TESTDB_incre_20161214_1652
 ==============================================
 ```
-
+### Binlog Backup example
 
 ```
 $ sh backup.sh --binlog
@@ -127,7 +171,7 @@ total size is 4751901052  speedup is 116.74
 == Backup : /bkup001/masvc01/TESTDB/binary_backup
 ==============================================
 ```
-
+### Engine Backup example
 
 ```
 $ sh backup.sh --engine
@@ -142,8 +186,7 @@ $ sh backup.sh --engine
 == All backup history : /bkup001/masvc01/TESTDB/backup_log/backup_all_history.log
 ==============================================
 ```
-
-
+### Delete Backups example
 
 ```
 $ sh backup.sh --delete
@@ -157,7 +200,7 @@ $ sh backup.sh --delete
 == All backup history : /bkup001/masvc01/TESTDB/backup_log/backup_all_history.log
 ==============================================
 ```
-
+### Show List of backups example
 
 ```
 $ sh backup.sh --list
