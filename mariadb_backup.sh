@@ -27,7 +27,7 @@
 # Set Environments
 ####################################
 
-DB_NAME='LGUERP_TEST'
+DB_NAME='TESTDB'
 MY_CNF="/engn001/masvc01/${DB_NAME}/my.cnf"
 
 RESERVE_DAYS=3 #DON'T  BE SET LESS THAN 1
