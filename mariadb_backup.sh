@@ -33,8 +33,8 @@ MY_CNF="/engn001/masvc01/${DB_NAME}/my.cnf"
 RESERVE_DAYS=3 #DON'T  BE SET LESS THAN 1
 
 OS_USER='masvc01'
-DB_USER='root'
-DB_PWD='qhdks123@'
+DB_USER='backupuser'
+DB_PWD='backupuser_pwd'
 SOCKET="/engn001/masvc01/${DB_NAME}/mysqld.sock"
 
 ENGINE_HOME='/engn001/masvc01/mariadb-10.0.28'
