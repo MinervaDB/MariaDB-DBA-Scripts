@@ -5,9 +5,8 @@
 # Scripts for DB Backup using XtraBackup                               #
 #                                                                      #
 # Written by: YJ                                                       #
-# QnA to : https://github.com/good-dba/mariadb-dba-scripts             #
-# Version: 0.1                                                         #
-# Released: 2016-12-14                                                 #
+# Version: 0.3                                                         #
+# Released: 2016-12-20                                                 #
 #                                                                      #
 # Tested with XtraBackup 2.4 on MariaDB 10.0.28                        #
 #                                                                      #
@@ -16,6 +15,7 @@
 # The following options may be given as the first argument:            #
 # --full      Full Backup                                              #
 # --incre     Incremental Backup                                       #
+# --schema    Schema Backup                                            #
 # --binlog    Binary Log Backup                                        #
 # --engine    Engine Backup                                            #
 # --delete    Delete Old Backups                                       #
@@ -27,14 +27,14 @@
 # Set Environments
 ####################################
 
-DB_NAME='TESTDB'
+DB_NAME='DBNAME'
 MY_CNF="/engn001/masvc01/${DB_NAME}/my.cnf"
 
-RESERVE_DAYS=3 #DON'T  BE SET LESS THAN 1
+RESERVE_DAYS=14 #DON'T  BE SET LESS THAN 1
 
 OS_USER='masvc01'
-DB_USER='backupuser'
-DB_PWD='backupuser_pwd'
+DB_USER='bkupusr'
+DB_PWD='bkupusr_password'
 SOCKET="/engn001/masvc01/${DB_NAME}/mysqld.sock"
 
 ENGINE_HOME='/engn001/masvc01/mariadb-10.0.28'
@@ -79,6 +79,7 @@ fn_full_backup() {
   # full backup
   BACKUP_NAME=${DB_NAME}_full_`date +'%Y%m%d_%H%M'`
   ${XTRABACKUP} --backup --no-timestamp --no-lock --target-dir=${BACKUP_HOME}/${BACKUP_NAME} 2>&1 | tee -a $LOG_FILE
+  cp ${MY_CNF} ${BACKUP_HOME}/${BACKUP_NAME}                                                 2>&1 | tee -a $LOG_FILE
 
   # apply logs only
   ${XTRABACKUP} --prepare --apply-log-only --target-dir=${BACKUP_HOME}/${BACKUP_NAME}        2>&1 | tee -a $LOG_FILE
@@ -100,7 +101,7 @@ fn_full_backup() {
 fn_incremental_backup() {
 
   # Get Lastest Backup Directory (this is a basedir)
-  LATEST_BACKUP=`find ${BACKUP_HOME} -name xtrabackup_info -type f -exec grep innodb_to_lsn {} + | sort -t "=" -k2 -n | tail -n1 | cut -d ":" -f 1`
+  LATEST_BACKUP=`find ${BACKUP_HOME} -name xtrabackup_info -type f -exec grep -H innodb_to_lsn {} + | sort -t "=" -k2 -n | tail -n1 | cut -d ":" -f 1`
   LATEST_BACKUP=`echo ${LATEST_BACKUP/"/xtrabackup_info"//}`
 
   REC_START_TIME=`date "+%Y-%m-%d %H:%M:%S"`
@@ -112,6 +113,7 @@ fn_incremental_backup() {
   # incremental backup
   BACKUP_NAME=${DB_NAME}_incre_`date +'%Y%m%d_%H%M'`
   ${XTRABACKUP} --backup --no-timestamp --no-lock --target-dir=${BACKUP_HOME}/${BACKUP_NAME} --incremental-basedir=${LATEST_BACKUP} 2>&1 | tee -a $LOG_FILE
+  cp ${MY_CNF} ${BACKUP_HOME}/${BACKUP_NAME}                                                 2>&1 | tee -a $LOG_FILE
 
   REC_END_TIME=`date "+%Y-%m-%d %H:%M:%S"`
   END_TIME=`date +%s`
@@ -123,6 +125,34 @@ fn_incremental_backup() {
   fn_write_history "${DB_NAME},${DB_USER},${REC_START_TIME},${REC_END_TIME},${LAP_TIME},${BACKUPSIZE},${BACKUPTYPE},${BACKUP_HOME}/${BACKUP_NAME},${LOG_FILE}"
 
 }
+
+####################################
+# Function: Schema Backup
+####################################
+fn_schema_backup() {
+
+  REC_START_TIME=`date "+%Y-%m-%d %H:%M:%S"`
+  START_TIME=`date +%s`
+
+  # schema backup
+  BACKUP_NAME=${DB_NAME}_schema_`date +'%Y%m%d_%H%M'`
+  if [ ! -d ${BACKUP_HOME}/${BACKUP_NAME} ]
+  then
+    mkdir ${BACKUP_HOME}/${BACKUP_NAME} | tee -a  $LOG_FILE
+  fi
+  ${MYSQLDUMP} -A --single-transaction --skip-add-drop-table --no-data --routines --events > ${BACKUP_HOME}/${BACKUP_NAME}/${BACKUP_NAME}.sql | tee -a $LOG_FILE
+
+  REC_END_TIME=`date "+%Y-%m-%d %H:%M:%S"`
+  END_TIME=`date +%s`
+  LAP_TIME=`expr $END_TIME - $START_TIME`
+
+  BACKUPTYPE='schema'
+  BACKUPSIZE=`du -sm ${BACKUP_HOME}/${BACKUP_NAME} | awk '{print $1}'`
+
+  fn_write_history "${DB_NAME},${DB_USER},${REC_START_TIME},${REC_END_TIME},${LAP_TIME},${BACKUPSIZE},${BACKUPTYPE},${BACKUP_HOME}/${BACKUP_NAME},${LOG_FILE}"
+
+}
+
 
 ####################################
 # Function: Binary Log Backup
@@ -208,6 +238,7 @@ fn_delete_backups() {
 ####################################
 fn_list_backups() {
 
+  # List of full/incremental backup
   for BACKUP_NAME in $(find ${BACKUP_HOME} -name xtrabackup_info -type f -exec grep innodb_to_lsn {} + | sort -t "=" -k2 -n | cut -d ":" -f 1)
   do
     echo "####################"
@@ -217,6 +248,7 @@ fn_list_backups() {
     grep -E 'start_time =|end_time =|partial =|incremental =|binlog_pos =' ${BACKUP_NAME}
   done
 
+  # List of binlog backup
   if [ -d ${BACKUP_HOME}/binary_backup ]
   then
     echo "####################"
@@ -224,7 +256,12 @@ fn_list_backups() {
     echo "####################"
     ls ${BACKUP_HOME}/binary_backup
   fi
-  #LATEST_BACKUP=`echo ${LATEST_BACKUP/"/xtrabackup_info"//}`
+
+  # List of schema backup
+  echo "####################"
+  echo "Schema Backups"
+  echo "####################"
+  find ${BACKUP_HOME} -name ${DB_NAME}_schema* -type d | sort
 
 }
 
@@ -238,6 +275,7 @@ fn_list_backups() {
 case "${1}" in
 "--full") ;;
 "--incre") ;;
+"--schema") ;;
 "--binlog") ;;
 "--engine") ;;
 "--delete") ;;
@@ -249,6 +287,7 @@ case "${1}" in
   echo "The following options may be given as the first argument: "
   echo "--full      Full Backup "
   echo "--incre     Incremental Backup "
+  echo "--schema    Schema Backup"
   echo "--binlog    Binary Log Backup "
   echo "--engine    Engine Backup "
   echo "--delete    Delete Old Backups "
@@ -257,11 +296,11 @@ case "${1}" in
   exit 0;;
 esac
 
-#echo "==============================================" 2>&1 | tee -a $LOG_FILE
-#echo "== ${DB_NAME} Backup"                           2>&1 | tee -a $LOG_FILE
-#echo "== Started : `date +'%Y/%m/%d %H:%M:%S'`"       2>&1 | tee -a $LOG_FILE
-#echo "== Log     : ${LOG_FILE}"                       2>&1 | tee -a $LOG_FILE
-#echo "==============================================" 2>&1 | tee -a $LOG_FILE
+# check log dir
+if test ! -d $LOG_HOME -o ! -w $LOG_HOME
+then
+  mkdir $LOG_HOME
+fi
 
 # check base dir exists and is writable
 if test ! -d $BACKUP_HOME -o ! -w $BACKUP_HOME
@@ -285,9 +324,9 @@ then
 fi
 
 # execute job
-echo "==============================================" 2>&1 | tee -a $LOG_FILE
 case "${1}" in
 "--full")
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
   echo "== ${DB_NAME} Full Backup"                      2>&1 | tee -a $LOG_FILE
   echo "== Started : `date +'%Y/%m/%d %H:%M:%S'`"       2>&1 | tee -a $LOG_FILE
   echo "==============================================" 2>&1 | tee -a $LOG_FILE
@@ -295,8 +334,12 @@ case "${1}" in
   echo "==============================================" 2>&1 | tee -a $LOG_FILE
   echo "== End    : `date +'%Y/%m/%d %H:%M:%S'`"        2>&1 | tee -a $LOG_FILE
   echo "== Backup : $BACKUP_HOME/$BACKUP_NAME"          2>&1 | tee -a $LOG_FILE
+  echo "== Log    : $LOG_FILE"
+  echo "== All backup history : ${LOG_HISTORY}"
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
   ;;
 "--incre")
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
   echo "== ${DB_NAME} Incremental Backup"               2>&1 | tee -a $LOG_FILE
   echo "== Started : `date +'%Y/%m/%d %H:%M:%S'`"       2>&1 | tee -a $LOG_FILE
   echo "==============================================" 2>&1 | tee -a $LOG_FILE
@@ -304,8 +347,25 @@ case "${1}" in
   echo "==============================================" 2>&1 | tee -a $LOG_FILE
   echo "== End    : `date +'%Y/%m/%d %H:%M:%S'`"        2>&1 | tee -a $LOG_FILE
   echo "== Backup : $BACKUP_HOME/$BACKUP_NAME"          2>&1 | tee -a $LOG_FILE
+  echo "== Log    : $LOG_FILE"
+  echo "== All backup history : ${LOG_HISTORY}"
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
+  ;;
+"--schema")
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
+  echo "== ${DB_NAME} Schema Backup"                    2>&1 | tee -a $LOG_FILE
+  echo "== Started : `date +'%Y/%m/%d %H:%M:%S'`"       2>&1 | tee -a $LOG_FILE
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
+  fn_schema_backup
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
+  echo "== End    : `date +'%Y/%m/%d %H:%M:%S'`"        2>&1 | tee -a $LOG_FILE
+  echo "== Backup : $BACKUP_HOME/$BACKUP_NAME"          2>&1 | tee -a $LOG_FILE
+  echo "== Log    : $LOG_FILE"
+  echo "== All backup history : ${LOG_HISTORY}"
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
   ;;
 "--binlog") 
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
   echo "== ${DB_NAME} Binlog Backup"                    2>&1 | tee -a $LOG_FILE
   echo "== Started : `date +'%Y/%m/%d %H:%M:%S'`"       2>&1 | tee -a $LOG_FILE
   echo "==============================================" 2>&1 | tee -a $LOG_FILE
@@ -313,8 +373,12 @@ case "${1}" in
   echo "==============================================" 2>&1 | tee -a $LOG_FILE
   echo "== End    : `date +'%Y/%m/%d %H:%M:%S'`"        2>&1 | tee -a $LOG_FILE
   echo "== Backup : $BACKUP_HOME/$BACKUP_NAME"          2>&1 | tee -a $LOG_FILE
+  echo "== Log    : $LOG_FILE"
+  echo "== All backup history : ${LOG_HISTORY}"
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
   ;;
 "--engine") 
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
   echo "== ${DB_NAME} Engine Backup"                    2>&1 | tee -a $LOG_FILE
   echo "== Started : `date +'%Y/%m/%d %H:%M:%S'`"       2>&1 | tee -a $LOG_FILE
   echo "==============================================" 2>&1 | tee -a $LOG_FILE
@@ -322,25 +386,28 @@ case "${1}" in
   echo "==============================================" 2>&1 | tee -a $LOG_FILE
   echo "== End    : `date +'%Y/%m/%d %H:%M:%S'`"        2>&1 | tee -a $LOG_FILE
   echo "== Backup : $BACKUP_HOME/$BACKUP_NAME"          2>&1 | tee -a $LOG_FILE
+  echo "== Log    : $LOG_FILE"
+  echo "== All backup history : ${LOG_HISTORY}"
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
   ;;
 "--delete") 
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
   echo "== ${DB_NAME} Delete Backups"                   2>&1 | tee -a $LOG_FILE
   echo "== Started : `date +'%Y/%m/%d %H:%M:%S'`"       2>&1 | tee -a $LOG_FILE
   echo "==============================================" 2>&1 | tee -a $LOG_FILE
   fn_delete_backups
   echo "==============================================" 2>&1 | tee -a $LOG_FILE
   echo "== End    : `date +'%Y/%m/%d %H:%M:%S'`"        2>&1 | tee -a $LOG_FILE
+  echo "== Log    : $LOG_FILE"
+  echo "== All backup history : ${LOG_HISTORY}"
+  echo "==============================================" 2>&1 | tee -a $LOG_FILE
   ;;
 "--list")
-  echo "== ${DB_NAME} Show List of backups on disk"     2>&1 | tee -a $LOG_FILE
-  echo "== Started : `date +'%Y/%m/%d %H:%M:%S'`"       2>&1 | tee -a $LOG_FILE
-  echo "==============================================" 2>&1 | tee -a $LOG_FILE
+  echo "=============================================="
+  echo "== ${DB_NAME} Show List of backups on disk"
+  echo "== Started : `date +'%Y/%m/%d %H:%M:%S'`"
+  echo "=============================================="
   fn_list_backups
-  echo "==============================================" 2>&1 | tee -a $LOG_FILE
-  echo "== End    : `date +'%Y/%m/%d %H:%M:%S'`"        2>&1 | tee -a $LOG_FILE
+  echo "== All backup history : ${LOG_HISTORY}"
   ;;
 esac
-
-echo "== Log    : $LOG_FILE"
-echo "== All backup history : ${LOG_HISTORY}"
-echo "==============================================" 2>&1 | tee -a $LOG_FILE
